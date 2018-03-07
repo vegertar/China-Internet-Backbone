@@ -1,1 +1,4 @@
-node_modules/
+.vscode/
+ip/asn/
+ip/china_area_mysql/
+ip/debug
