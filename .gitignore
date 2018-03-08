@@ -2,3 +2,5 @@
 ip/asn/
 ip/china_area_mysql/
 ip/debug
+route/__pycache__/
+route/*.pyc
