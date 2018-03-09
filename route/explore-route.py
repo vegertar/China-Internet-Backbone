@@ -67,24 +67,6 @@ def traceroute(host, out, sema):
         sema.release()
 
 
-def report(url, data):
-    import requests
-    import zlib
-    import json
-
-    s = json.dumps(data)
-
-    if not url:
-        print(s)
-        return
-
-    r = requests.post(url, 
-        data=zlib.compress(s),
-        headers={"Content-Encoding": "gzip"},
-    )
-    print(r.text)
-
-
 def main():
     import sys
     import threading
@@ -104,7 +86,8 @@ def main():
         if out:
             results.append(out[0])
 
-    report(sys.argv[1] if len(sys.argv) > 1 else None, results)
+    if results:
+        print(json.dumps(results))
 
 
 if __name__ == "__main__":

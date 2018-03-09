@@ -111,7 +111,7 @@ class TracerouteParser(object):
         """Parser entry point, given string of the whole traceroute output."""
         import sys
 
-        if sys.version_info[0] == 3:
+        if sys.version_info[0] >= 3:
             from io import StringIO
         else:
             from cStringIO import StringIO

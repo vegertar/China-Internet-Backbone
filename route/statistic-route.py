@@ -4,42 +4,22 @@ import logging
 
 cache = {}
 
-def todict(obj, classkey=None):
-    if isinstance(obj, dict):
-        data = {}
-        for (k, v) in obj.items():
-            data[k] = todict(v, classkey)
-        return data
-    elif hasattr(obj, "_ast"):
-        return todict(obj._ast())
-    elif hasattr(obj, "__iter__"):
-        return [todict(v, classkey) for v in obj]
-    elif hasattr(obj, "__dict__"):
-        data = dict([(key, todict(value, classkey)) 
-            for key, value in obj.__dict__.items() 
-            if not callable(value) and not key.startswith('_')])
-        if classkey is not None and hasattr(obj, "__class__"):
-            data[classkey] = obj.__class__.__name__
-        return data
-    else:
-        return obj
-
-
 def get_routes(ip, ip_parser):
-    import requests
     import json
     import sys
 
-    if sys.version_info[0] == 3:
+    if sys.version_info[0] >= 3:
         from urllib.parse import urlparse
+        from urllib.request import urlopen
     else:
         from urlparse import urlparse
+        from urllib2 import urlopen
 
     routes = []
 
     try:
-        r = requests.get('http://g3.letv.com/r?uip={uip}&format={format}'.format(uip=ip, format=1), timeout=5000)
-        data = json.loads(r.text)
+        r = urlopen('http://g3.letv.com/r?uip={uip}&format={format}'.format(uip=ip, format=1), timeout=5)
+        data = json.load(r)
         source = data['remote']
 
         for node in data.get('nodelist', []):
@@ -51,17 +31,19 @@ def get_routes(ip, ip_parser):
                     continue
 
                 logging.info("Downloading routes from {}".format(url))
-                r = requests.get(url, timeout=5000)
-                logging.info("Status code {}, content size {}".format(r.status_code, len(r.text)))
+                r = urlopen(url, timeout=5)
+                text = r.read()
+                status_code = r.getcode()
+                logging.info("Status code {}, content size {}".format(status_code, len(text)))
 
-                if r.status_code == 200:
+                if status_code == 200:
                     cache[url] = True
                     routes.append((
                         {
                             'source': source,
                             'ipinfo': ip_parser(source),
                         },
-                        json.loads(r.text)
+                        json.loads(text)
                     ))
             except Exception as e:
                 logging.error(e, exc_info=True)
@@ -73,13 +55,18 @@ def get_routes(ip, ip_parser):
 
 
 def parse_ip(api, ip):
-    import requests
     import json
+    import sys
+
+    if sys.version_info[0] >= 3:
+        from urllib.request import urlopen
+    else:
+        from urllib2 import urlopen
 
     try:
-        r = requests.get(api + '/' + ip)
-        if r.status_code == 200:
-            return json.loads(r.text)
+        r = urlopen(api + '/' + ip)
+        if r.getcode() == 200:
+            return json.load(r)
     except Exception as e:
         logging.error(e, exc_info=True)
 
@@ -89,16 +76,30 @@ def parse_routes(routes, ip_parser):
 
     for (_, route_items) in routes:
         for i in range(len(route_items)):
+            result = {}
             trp = parser.TracerouteParser()
             trp.parse_data(route_items[i])
-            trp.dest_ipinfo = ip_parser(trp.dest_ip)
 
+            hops = []
             for hop in trp.hops:
+                probes = []
                 for probe in hop.probes:
-                    if probe.ipaddr:
-                        probe.ipinfo = ip_parser(probe.ipaddr)
+                    probes.append({
+                        'ipaddr' : probe.ipaddr,
+                        'ipinfo': ip_parser(probe.ipaddr) if probe.ipaddr else None,
+                        'rtt': probe.rtt,
+                        'anno': probe.anno,
+                        'name': probe.name,
+                    })
 
-            route_items[i] = todict(trp)
+                hops.append(dict(probes=probes))
+
+            route_items[i] = {
+                'dest_ip': trp.dest_ip,
+                'dest_name': trp.dest_name,
+                'dest_ipinfo': ip_parser(trp.dest_ip),
+                'hops': hops,
+            }
 
 
 def main():
