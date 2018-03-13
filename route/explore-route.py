@@ -157,7 +157,7 @@ def traceroute(host, out, sema):
 
 
 def main():
-    import sys
+    import json
     import threading
 
     params = []
