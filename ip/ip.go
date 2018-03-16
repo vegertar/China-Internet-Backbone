@@ -77,16 +77,19 @@ func (l *Library) Find(ip string) (loc *ip17mon.LocationInfo, area Area, entries
 		return
 	}
 
-	if loc.Country == "中国" {
-		var ok bool
-		area, ok = l.area[loc.Region+","+loc.City]
+	area, _ = l.getArea(loc.Country, loc.Region, loc.City)
+	entries, err = l.net.ContainingNetworks(net.ParseIP(ip))
+
+	return
+}
+
+func (l *Library) getArea(country, region, city string) (area Area, ok bool) {
+	if country == "中国" {
+		area, ok = l.area[region+","+city]
 		if !ok {
-			area, ok = l.area[loc.Region]
+			area, ok = l.area[region]
 		}
-
-		entries, err = l.net.ContainingNetworks(net.ParseIP(ip))
 	}
-
 	return
 }
 
@@ -106,7 +109,7 @@ func (l *Library) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	v["Lng"] = area.Lng
 	v["Lat"] = area.Lat
 	v["Networks"] = entries
-
+	v["Source"] = "IPIP.net's free data plan"
 	b, err := json.Marshal(v)
 	if err != nil {
 		http.Error(w, err.Error(), 400)
